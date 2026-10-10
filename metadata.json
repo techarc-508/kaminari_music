@@ -1,0 +1,6 @@
+{
+  "name": "Kaminari Music",
+  "description": "Premium Self-Hosted Hi-Res Android Music Player for Navidrome and Kaminari Media Gateway",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
