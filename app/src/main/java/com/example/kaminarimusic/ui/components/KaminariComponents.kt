@@ -23,6 +23,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import java.io.File
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -63,46 +66,63 @@ fun KaminariArtwork(
     artist: String,
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 16.dp,
-    iconSize: Dp = 36.dp
+    iconSize: Dp = 36.dp,
+    localArtworkPath: String? = null
 ) {
-    // Generate deterministic rich gradient colors based on title hash
-    val hash = (title.hashCode() xor artist.hashCode()).let { if (it < 0) -it else it }
-    val gradientList = remember(hash) {
-        val colorPairs = listOf(
-            listOf(Color(0xFF5C4BEA), Color(0xFF8582AE), Color(0xFF1E1E38)),
-            listOf(Color(0xFF6366F1), Color(0xFFEC4899), Color(0xFF17172F)),
-            listOf(Color(0xFF3B82F6), Color(0xFF8B5CF6), Color(0xFF24243D)),
-            listOf(Color(0xFF8B5CF6), Color(0xFFF43F5E), Color(0xFF17172F)),
-            listOf(Color(0xFF06B6D4), Color(0xFF3B82F6), Color(0xFF1E1E38)),
-            listOf(Color(0xFF10B981), Color(0xFF3B82F6), Color(0xFF24243D))
-        )
-        colorPairs[hash % colorPairs.size]
+    val localFile = remember(localArtworkPath) {
+        if (!localArtworkPath.isNullOrEmpty()) {
+            val f = File(localArtworkPath)
+            if (f.exists() && f.isFile && f.length() > 0) f else null
+        } else null
     }
 
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(cornerRadius))
-            .background(Brush.linearGradient(gradientList)),
-        contentAlignment = Alignment.Center
-    ) {
-        // Subtle ambient inner overlay
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(Color.Transparent, Color(0x80000000)),
-                        radius = 200f
-                    )
-                )
+    if (localFile != null) {
+        AsyncImage(
+            model = localFile,
+            contentDescription = "$title - $artist",
+            modifier = modifier.clip(RoundedCornerShape(cornerRadius)),
+            contentScale = ContentScale.Crop
         )
+    } else {
+        // Generate deterministic rich gradient colors based on title hash
+        val hash = (title.hashCode() xor artist.hashCode()).let { if (it < 0) -it else it }
+        val gradientList = remember(hash) {
+            val colorPairs = listOf(
+                listOf(Color(0xFF5C4BEA), Color(0xFF8582AE), Color(0xFF1E1E38)),
+                listOf(Color(0xFF6366F1), Color(0xFFEC4899), Color(0xFF17172F)),
+                listOf(Color(0xFF3B82F6), Color(0xFF8B5CF6), Color(0xFF24243D)),
+                listOf(Color(0xFF8B5CF6), Color(0xFFF43F5E), Color(0xFF17172F)),
+                listOf(Color(0xFF06B6D4), Color(0xFF3B82F6), Color(0xFF1E1E38)),
+                listOf(Color(0xFF10B981), Color(0xFF3B82F6), Color(0xFF24243D))
+            )
+            colorPairs[hash % colorPairs.size]
+        }
 
-        Icon(
-            imageVector = Icons.Default.MusicNote,
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.85f),
-            modifier = Modifier.size(iconSize)
-        )
+        Box(
+            modifier = modifier
+                .clip(RoundedCornerShape(cornerRadius))
+                .background(Brush.linearGradient(gradientList)),
+            contentAlignment = Alignment.Center
+        ) {
+            // Subtle ambient inner overlay
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(Color.Transparent, Color(0x80000000)),
+                            radius = 200f
+                        )
+                    )
+            )
+
+            Icon(
+                imageVector = Icons.Default.MusicNote,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.85f),
+                modifier = Modifier.size(iconSize)
+            )
+        }
     }
 }
 
@@ -289,11 +309,11 @@ fun KaminariServerStatus(
                 modifier = Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(if (isConnected) Color(0xFF10B981) else Color(0xFFEF4444))
+                    .background(if (isConnected) Color(0xFF10B981) else Color(0xFFF59E0B))
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = if (isConnected) "Connected" else "Offline",
+                text = if (isConnected) "Connected" else "Offline Cache",
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                 color = KaminariPrimaryText
             )
@@ -330,6 +350,7 @@ fun KaminariSongRow(
             KaminariArtwork(
                 title = song.title,
                 artist = song.artist,
+                localArtworkPath = song.cachedArtworkPath ?: song.coverArtUrl,
                 modifier = Modifier.size(50.dp),
                 cornerRadius = 10.dp,
                 iconSize = 24.dp

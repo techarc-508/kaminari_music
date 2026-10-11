@@ -49,7 +49,6 @@ class MainActivity : ComponentActivity() {
 
                 val songs by viewModel.allSongs.collectAsState()
                 val albums by viewModel.allAlbums.collectAsState()
-                val pendingOps by viewModel.pendingOperations.collectAsState()
                 val currentSong by viewModel.playerManager.currentSong.collectAsState()
                 val isPlaying by viewModel.playerManager.isPlaying.collectAsState()
                 val volume by viewModel.playerManager.volume.collectAsState()
@@ -57,6 +56,9 @@ class MainActivity : ComponentActivity() {
                 val normalizationEnabled by viewModel.playerManager.audioNormalizationEnabled.collectAsState()
                 val crossfadeDuration by viewModel.playerManager.crossfadeDurationMs.collectAsState()
                 val sleepTimerMinutes by viewModel.playerManager.sleepTimerMinutesRemaining.collectAsState()
+                val offlinePrefs by viewModel.offlinePreferences.collectAsState()
+                val offlineCount by viewModel.offlineCount.collectAsState()
+                val cacheSizeMb by viewModel.cacheSizeMb.collectAsState()
 
                 BackHandler(enabled = showNowPlayingSheet || showEqualizer || selectedSongForManagement != null || currentRoute != "home") {
                     when {
@@ -105,7 +107,10 @@ class MainActivity : ComponentActivity() {
                     ) {
                         when {
                             showEqualizer -> {
-                                EqualizerScreen(onBack = { showEqualizer = false })
+                                EqualizerScreen(
+                                    equalizerManager = viewModel.playerManager.equalizerManager,
+                                    onBack = { showEqualizer = false }
+                                )
                             }
                             selectedSongForManagement != null -> {
                                 ManagementScreen(
@@ -128,7 +133,9 @@ class MainActivity : ComponentActivity() {
                                         onAlbumClick = { /* Album detail / filter */ },
                                         onManageSong = { selectedSongForManagement = it },
                                         onNavigateSearch = { currentRoute = "search" },
-                                        onToggleFavorite = { viewModel.toggleFavorite(it) }
+                                        onToggleFavorite = { viewModel.toggleFavorite(it) },
+                                        isOfflineMode = offlinePrefs.isOfflineModeForced,
+                                        isNavidromeConnected = offlinePrefs.isNavidromeConnected
                                     )
                                     "library" -> LibraryScreen(
                                         songs = songs,
@@ -168,7 +175,15 @@ class MainActivity : ComponentActivity() {
                                         onStartSleepTimer = { viewModel.playerManager.startSleepTimer(it) },
                                         onCancelSleepTimer = { viewModel.playerManager.cancelSleepTimer() },
                                         onOpenEqualizer = { showEqualizer = true },
-                                        onScanMusic = { viewModel.scanLocalMusic() }
+                                        onScanMusic = { viewModel.scanLocalMusic() },
+                                        isOfflineModeForced = offlinePrefs.isOfflineModeForced,
+                                        isNavidromeConnected = offlinePrefs.isNavidromeConnected,
+                                        cachedCount = offlineCount,
+                                        cacheSizeMb = cacheSizeMb,
+                                        onToggleOfflineMode = { viewModel.toggleForceOfflineMode(it) },
+                                        onToggleNavidromeConnected = { viewModel.setNavidromeConnectionStatus(it) },
+                                        onCacheAllOffline = { viewModel.cacheAllLibraryOffline() },
+                                        onClearOfflineCache = { viewModel.clearOfflineCache() }
                                     )
                                 }
                             }
@@ -202,7 +217,13 @@ class MainActivity : ComponentActivity() {
                                     showNowPlayingSheet = false
                                 }
                             },
-                            onSeek = { seekMs -> viewModel.playerManager.seekTo(seekMs) }
+                            onSeek = { seekMs -> viewModel.playerManager.seekTo(seekMs) },
+                            onOpenEqualizer = {
+                                scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                    showNowPlayingSheet = false
+                                    showEqualizer = true
+                                }
+                            }
                         )
                     }
                 }

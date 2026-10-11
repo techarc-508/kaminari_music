@@ -48,7 +48,9 @@ fun HomeScreen(
     onAlbumClick: (AlbumEntity) -> Unit,
     onManageSong: (SongEntity) -> Unit,
     onNavigateSearch: () -> Unit = {},
-    onToggleFavorite: (Long) -> Unit = {}
+    onToggleFavorite: (Long) -> Unit = {},
+    isOfflineMode: Boolean = false,
+    isNavidromeConnected: Boolean = true
 ) {
     var selectedCategory by remember { mutableStateOf("Trending") }
     val categories = listOf("Trending", "Rock", "Hip Hop", "Electro", "Pop", "Jazz", "Classical", "Hi-Res Master")
@@ -94,6 +96,37 @@ fun HomeScreen(
                 contentPadding = PaddingValues(top = 80.dp, bottom = 120.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
+                if (!isNavidromeConnected) {
+                    item {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            color = Color(0x22F59E0B),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x44F59E0B))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudOff,
+                                    contentDescription = null,
+                                    tint = KaminariHiResGold,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "Navidrome connection lost • Playing from Room offline cache",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = KaminariHiResGold
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Trending Right Now Header with subtle scroll parallax
                 item {
                     val headerAlpha = remember {
@@ -147,6 +180,7 @@ fun HomeScreen(
                                 KaminariArtwork(
                                     title = song.title,
                                     artist = song.artist,
+                                    localArtworkPath = song.cachedArtworkPath ?: song.coverArtUrl,
                                     modifier = Modifier.fillMaxSize(),
                                     cornerRadius = 24.dp,
                                     iconSize = 48.dp
@@ -296,6 +330,7 @@ fun HomeScreen(
                                         KaminariArtwork(
                                             title = album.title,
                                             artist = album.artist ?: "",
+                                            localArtworkPath = album.localCoverArtPath ?: album.coverArtUrl,
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .height(136.dp),
@@ -380,8 +415,8 @@ fun HomeScreen(
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         KaminariServerStatus(
-                            isConnected = true,
-                            serverName = "Navidrome"
+                            isConnected = !isOfflineMode && isNavidromeConnected,
+                            serverName = if (isOfflineMode || !isNavidromeConnected) "Offline Cache" else "Navidrome"
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         IconButton(

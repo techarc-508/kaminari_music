@@ -45,7 +45,8 @@ fun NowPlayingScreen(
     onPreviousClick: () -> Unit,
     onVolumeChange: (Float) -> Unit,
     onBack: () -> Unit,
-    onSeek: (Long) -> Unit = {}
+    onSeek: (Long) -> Unit = {},
+    onOpenEqualizer: () -> Unit = {}
 ) {
     if (currentSong == null) {
         Box(
@@ -163,22 +164,45 @@ fun NowPlayingScreen(
                         .background(Color(0x33FFFFFF))
                 )
 
-                IconButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        showLyrics = !showLyrics
-                    },
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(if (showLyrics) KaminariPrimary.copy(alpha = 0.3f) else Color(0x14FFFFFF))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = if (showLyrics) Icons.Filled.Notes else Icons.Outlined.Notes,
-                        contentDescription = "Lyrics",
-                        tint = if (showLyrics) KaminariPrimary else KaminariPrimaryText,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    IconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onOpenEqualizer()
+                        },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x14FFFFFF))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = "Equalizer",
+                            tint = KaminariPrimaryText,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            showLyrics = !showLyrics
+                        },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(if (showLyrics) KaminariPrimary.copy(alpha = 0.3f) else Color(0x14FFFFFF))
+                    ) {
+                        Icon(
+                            imageVector = if (showLyrics) Icons.Filled.Notes else Icons.Outlined.Notes,
+                            contentDescription = "Lyrics",
+                            tint = if (showLyrics) KaminariPrimary else KaminariPrimaryText,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
 
@@ -210,6 +234,7 @@ fun NowPlayingScreen(
                     KaminariArtwork(
                         title = currentSong.title,
                         artist = currentSong.artist,
+                        localArtworkPath = currentSong.localCoverArtPath,
                         modifier = Modifier.fillMaxSize(),
                         cornerRadius = 32.dp,
                         iconSize = 80.dp

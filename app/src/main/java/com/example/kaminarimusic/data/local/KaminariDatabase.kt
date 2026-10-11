@@ -17,7 +17,7 @@ import com.example.kaminarimusic.data.local.entity.SyncOperationEntity
         ArtistEntity::class,
         SyncOperationEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class KaminariDatabase : RoomDatabase() {

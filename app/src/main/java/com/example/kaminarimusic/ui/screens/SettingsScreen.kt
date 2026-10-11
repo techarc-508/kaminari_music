@@ -1,10 +1,12 @@
 package com.example.kaminarimusic.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -32,10 +34,19 @@ fun SettingsScreen(
     onStartSleepTimer: (Int) -> Unit,
     onCancelSleepTimer: () -> Unit,
     onOpenEqualizer: () -> Unit,
-    onScanMusic: () -> Unit
+    onScanMusic: () -> Unit,
+    isOfflineModeForced: Boolean = false,
+    isNavidromeConnected: Boolean = true,
+    cachedCount: Int = 0,
+    cacheSizeMb: Float = 0f,
+    onToggleOfflineMode: (Boolean) -> Unit = {},
+    onToggleNavidromeConnected: (Boolean) -> Unit = {},
+    onCacheAllOffline: () -> Unit = {},
+    onClearOfflineCache: () -> Unit = {}
 ) {
     var navidromeUrl by remember { mutableStateOf("https://music.kaminari-hi-fi.internal") }
     var username by remember { mutableStateOf("audiophile_master") }
+    var showCacheSuccessToast by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
     Column(
@@ -53,6 +64,174 @@ fun SettingsScreen(
             style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
             color = KaminariPrimaryText
         )
+
+        // Offline Caching & Navidrome Resilience (Room & DataStore)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Offline Playback & Storage",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = KaminariPrimaryText
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isNavidromeConnected) Color(0x2210B981) else Color(0x22F59E0B),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (isNavidromeConnected) Color(0x5510B981) else Color(0x55F59E0B)
+                    )
+                ) {
+                    Text(
+                        text = if (isNavidromeConnected) "ROOM + NAVIDROME" else "OFFLINE CACHE ONLY",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                        color = if (isNavidromeConnected) Color(0xFF34D399) else KaminariHiResGold
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(KaminariDarkSurface)
+                    .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(20.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    // Force Offline Mode Switch (DataStore)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Offline Playback Mode",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = KaminariPrimaryText
+                            )
+                            Text(
+                                "Bypass server and play metadata/art from Room",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = KaminariSecondaryText
+                            )
+                        }
+                        Switch(
+                            checked = isOfflineModeForced,
+                            onCheckedChange = onToggleOfflineMode,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = KaminariPrimary
+                            )
+                        )
+                    }
+
+                    // Connection Simulation Toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Navidrome Online State",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = KaminariPrimaryText
+                            )
+                            Text(
+                                if (isNavidromeConnected) "Connection active" else "Connection lost - using offline cache",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isNavidromeConnected) Color(0xFF34D399) else KaminariHiResGold
+                            )
+                        }
+                        Switch(
+                            checked = isNavidromeConnected,
+                            onCheckedChange = onToggleNavidromeConnected,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFF10B981),
+                                uncheckedThumbColor = Color(0xFFF59E0B),
+                                uncheckedTrackColor = Color(0x33F59E0B)
+                            )
+                        )
+                    }
+
+                    HorizontalDivider(color = Color(0x14FFFFFF))
+
+                    // Cache Stats Card
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Cached Metadata & Artwork",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = KaminariPrimaryText
+                            )
+                            Text(
+                                text = "$cachedCount songs stored • ${String.format("%.1f", cacheSizeMb)} MB disk cache",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = KaminariHiResGold
+                            )
+                        }
+                    }
+
+                    // Cache All Action Button
+                    Button(
+                        onClick = {
+                            onCacheAllOffline()
+                            showCacheSuccessToast = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = KaminariPrimary),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Cache All Library Metadata & Art", fontWeight = FontWeight.Bold)
+                    }
+
+                    AnimatedVisibility(visible = showCacheSuccessToast) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0x2210B981),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF34D399), modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Metadata and album art successfully cached for offline use!", color = Color(0xFF34D399), style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+
+                    // Clear Cache Action Button
+                    OutlinedButton(
+                        onClick = onClearOfflineCache,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = KaminariSecondaryText)
+                    ) {
+                        Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Clear Offline Cached Files")
+                    }
+                }
+            }
+        }
 
         // Audio Engine & Hi-Fi Playback Card
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -80,7 +259,7 @@ fun SettingsScreen(
                     ) {
                         Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("10-Band Hi-Fi Equalizer", fontWeight = FontWeight.Bold)
+                        Text("Audio Equalizer (Jazz, Rock, Classical)", fontWeight = FontWeight.Bold)
                     }
 
                     HorizontalDivider(color = Color(0x14FFFFFF))

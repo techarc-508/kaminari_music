@@ -22,8 +22,10 @@ data class SongEntity(
     val codec: String? = null,
     val bitrate: Int? = null,
     val coverArtUrl: String? = null,
-    val localFilePath: String? = null,
-    val isDownloaded: Boolean = false,
+    val localCoverArtPath: String? = null, // Path to local cached album art on disk
+    val cachedArtworkPath: String? = null, // Alias for localCoverArtPath
+    val localFilePath: String? = null, // Path to local cached audio file
+    val isDownloaded: Boolean = false, // Ready for offline playback
     val isFavorite: Boolean = false,
     val rating: Int = 0,
     val lyrics: String? = null,

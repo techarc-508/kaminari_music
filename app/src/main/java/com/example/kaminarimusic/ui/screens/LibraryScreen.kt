@@ -38,7 +38,7 @@ fun LibraryScreen(
     onToggleFavorite: (Long) -> Unit = {}
 ) {
     var selectedTab by remember { mutableStateOf("Songs") }
-    val tabs = listOf("Songs", "Albums", "Downloads", "Favorites")
+    val tabs = listOf("Songs", "Albums", "Offline Cache", "Favorites")
 
     Column(
         modifier = Modifier
@@ -133,6 +133,7 @@ fun LibraryScreen(
                                 KaminariArtwork(
                                     title = album.title,
                                     artist = album.artist ?: "",
+                                    localArtworkPath = album.cachedArtworkPath ?: album.coverArtUrl,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .aspectRatio(1f),
@@ -166,9 +167,9 @@ fun LibraryScreen(
                     }
                 }
             }
-            "Downloads" -> {
-                val downloaded = songs.filter { it.isDownloaded }
-                if (downloaded.isEmpty()) {
+            "Offline Cache" -> {
+                val cachedSongs = songs.filter { it.isDownloaded || it.cachedArtworkPath != null || it.localFilePath != null }
+                if (cachedSongs.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -176,9 +177,9 @@ fun LibraryScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.DownloadDone, contentDescription = null, tint = KaminariSecondaryText, modifier = Modifier.size(48.dp))
+                            Icon(Icons.Default.CloudDone, contentDescription = null, tint = KaminariSecondaryText, modifier = Modifier.size(48.dp))
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text("No downloaded tracks yet", color = KaminariSecondaryText)
+                            Text("No offline cached tracks yet", color = KaminariSecondaryText)
                         }
                     }
                 } else {
@@ -187,9 +188,33 @@ fun LibraryScreen(
                             .fillMaxWidth()
                             .weight(1f),
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 40.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(downloaded, key = { it.id }) { song ->
+                        item {
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0x2210B981),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x3310B981))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Storage, contentDescription = null, tint = Color(0xFF34D399), modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "${cachedSongs.size} tracks cached in Room Database with local album artwork",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFF34D399)
+                                    )
+                                }
+                            }
+                        }
+
+                        items(cachedSongs, key = { it.id }) { song ->
                             Box(modifier = Modifier.animateItem()) {
                                 KaminariSongRow(
                                     song = song,

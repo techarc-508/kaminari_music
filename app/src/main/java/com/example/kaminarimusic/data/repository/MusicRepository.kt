@@ -1,5 +1,7 @@
 package com.example.kaminarimusic.data.repository
 
+import com.example.kaminarimusic.data.local.cache.ArtworkCacheManager
+import com.example.kaminarimusic.data.local.cache.OfflineCachePreferences
 import com.example.kaminarimusic.data.local.dao.MusicDao
 import com.example.kaminarimusic.data.local.entity.AlbumEntity
 import com.example.kaminarimusic.data.local.entity.ArtistEntity
@@ -9,13 +11,12 @@ import com.example.kaminarimusic.data.network.MediaGatewayApi
 import com.example.kaminarimusic.data.network.MetadataUpdateRequest
 import com.example.kaminarimusic.data.network.NavidromeApi
 import kotlinx.coroutines.flow.Flow
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.asRequestBody
-import java.io.File
+import kotlinx.coroutines.flow.firstOrNull
 
 class MusicRepository(
     private val musicDao: MusicDao,
+    val artworkCacheManager: ArtworkCacheManager? = null,
+    val offlineCachePreferences: OfflineCachePreferences? = null,
     private val navidromeApi: NavidromeApi? = null,
     private val mediaGatewayApi: MediaGatewayApi? = null
 ) {
@@ -24,10 +25,57 @@ class MusicRepository(
     val allArtists: Flow<List<ArtistEntity>> = musicDao.getAllArtists()
     val favoriteSongs: Flow<List<SongEntity>> = musicDao.getFavoriteSongs()
     val downloadedSongs: Flow<List<SongEntity>> = musicDao.getDownloadedSongs()
+    val offlineSongs: Flow<List<SongEntity>> = musicDao.getOfflineSongs()
+    val offlineCachedCount: Flow<Int> = musicDao.getOfflineCachedCount()
     val pendingOperations: Flow<List<SyncOperationEntity>> = musicDao.getPendingSyncOperations()
 
-    suspend fun insertSong(song: SongEntity) = musicDao.insertSong(song)
+    suspend fun insertSong(song: SongEntity): Long {
+        var songToInsert = song
+        if (song.localCoverArtPath.isNullOrEmpty() && artworkCacheManager != null) {
+            val artPath = artworkCacheManager.generateAndCacheArtwork(song.title, song.artist, song.serverId)
+            if (artPath.isNotEmpty()) {
+                songToInsert = song.copy(localCoverArtPath = artPath)
+            }
+        }
+        return musicDao.insertSong(songToInsert)
+    }
+
     suspend fun updateSong(song: SongEntity) = musicDao.updateSong(song)
+
+    suspend fun cacheAllTracksAndArtForOffline(): Int {
+        val songs = musicDao.getAllSongs().firstOrNull() ?: emptyList()
+        var cached = 0
+        songs.forEach { song ->
+            var updated = song
+            if (artworkCacheManager != null && song.localCoverArtPath.isNullOrEmpty()) {
+                val artPath = artworkCacheManager.generateAndCacheArtwork(song.title, song.artist, song.serverId)
+                if (artPath.isNotEmpty()) {
+                    updated = updated.copy(localCoverArtPath = artPath)
+                }
+            }
+            updated = updated.copy(isDownloaded = true)
+            musicDao.updateSong(updated)
+            cached++
+        }
+
+        val albums = musicDao.getAllAlbums().firstOrNull() ?: emptyList()
+        albums.forEach { album ->
+            if (artworkCacheManager != null && album.localCoverArtPath.isNullOrEmpty()) {
+                val artPath = artworkCacheManager.generateAndCacheArtwork(album.title, album.artist, album.serverId)
+                if (artPath.isNotEmpty()) {
+                    musicDao.updateAlbumArtworkPath(album.id, artPath)
+                }
+            }
+        }
+
+        offlineCachePreferences?.recordSync(cached)
+        return cached
+    }
+
+    suspend fun clearOfflineArtworkCache() {
+        artworkCacheManager?.clearCache()
+    }
+
     suspend fun deleteSong(id: Long) {
         val song = musicDao.getSongById(id)
         if (song != null) {
@@ -94,22 +142,31 @@ class MusicRepository(
     }
 
     suspend fun refreshFromServer(user: String, token: String, salt: String) {
-        if (navidromeApi == null) return
+        if (navidromeApi == null) {
+            offlineCachePreferences?.setServerConnectionState("OFFLINE_FALLBACK")
+            return
+        }
         try {
+            offlineCachePreferences?.setServerConnectionState("CONNECTING")
             val resp = navidromeApi.getAlbums(user = user, token = token, salt = salt)
             val albums = resp.subsonicResponse?.albumList2?.album ?: emptyList()
             val albumEntities = albums.map {
+                val artPath = artworkCacheManager?.generateAndCacheArtwork(it.title, it.artist, it.id)
                 AlbumEntity(
                     serverId = it.id,
                     title = it.title,
                     artist = it.artist,
                     year = it.year,
-                    songCount = it.songCount ?: 0
+                    songCount = it.songCount ?: 0,
+                    localCoverArtPath = artPath
                 )
             }
             musicDao.insertAlbums(albumEntities)
+            offlineCachePreferences?.setServerConnectionState("ONLINE")
+            offlineCachePreferences?.recordSync(albumEntities.size)
         } catch (e: Exception) {
-            // Handle network failure gracefully
+            // Gracefully fall back to local Room database cache when Navidrome connection is lost
+            offlineCachePreferences?.setServerConnectionState("OFFLINE_FALLBACK")
         }
     }
 }

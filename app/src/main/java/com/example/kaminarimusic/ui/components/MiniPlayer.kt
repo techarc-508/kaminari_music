@@ -66,6 +66,7 @@ fun MiniPlayer(
                 KaminariArtwork(
                     title = currentSong.title,
                     artist = currentSong.artist,
+                    localArtworkPath = currentSong.localCoverArtPath,
                     modifier = Modifier.size(48.dp),
                     cornerRadius = 12.dp,
                     iconSize = 22.dp

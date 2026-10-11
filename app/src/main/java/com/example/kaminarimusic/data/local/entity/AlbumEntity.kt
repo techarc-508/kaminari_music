@@ -13,6 +13,8 @@ data class AlbumEntity(
     val year: Int? = null,
     val genre: String? = null,
     val coverArtUrl: String? = null,
+    val localCoverArtPath: String? = null, // Path to local cached album art on disk
+    val cachedArtworkPath: String? = null, // Alias
     val songCount: Int = 0,
     val duration: Long = 0L,
     val codec: String? = null,

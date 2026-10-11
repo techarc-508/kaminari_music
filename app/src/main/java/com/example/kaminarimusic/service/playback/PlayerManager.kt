@@ -7,6 +7,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import com.example.kaminarimusic.data.local.entity.SongEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +25,8 @@ class PlayerManager(context: Context) {
         .setUsage(C.USAGE_MEDIA)
         .setContentType(C.CONTENT_TYPE_MUSIC)
         .build()
+
+    val equalizerManager = EqualizerManager(context)
 
     val exoPlayer: ExoPlayer = try {
         ExoPlayer.Builder(context)
@@ -83,6 +86,21 @@ class PlayerManager(context: Context) {
                 }
             }
         })
+
+        exoPlayer.addAnalyticsListener(object : AnalyticsListener {
+            override fun onAudioSessionIdChanged(eventTime: AnalyticsListener.EventTime, audioSessionId: Int) {
+                if (audioSessionId > 0) {
+                    equalizerManager.attachAudioSession(audioSessionId)
+                }
+            }
+        })
+
+        try {
+            val initialSessionId = exoPlayer.audioSessionId
+            if (initialSessionId > 0) {
+                equalizerManager.attachAudioSession(initialSessionId)
+            }
+        } catch (_: Exception) {}
     }
 
     private fun startProgressTracker() {
@@ -163,6 +181,9 @@ class PlayerManager(context: Context) {
             exoPlayer.play()
             _isPlaying.value = true
             startProgressTracker()
+            if (exoPlayer.audioSessionId > 0) {
+                equalizerManager.attachAudioSession(exoPlayer.audioSessionId)
+            }
         } catch (e: Exception) {
             _isPlaying.value = false
         }
@@ -219,6 +240,7 @@ class PlayerManager(context: Context) {
     fun release() {
         progressJob?.cancel()
         sleepTimerJob?.cancel()
+        equalizerManager.release()
         try {
             exoPlayer.release()
         } catch (_: Exception) {}

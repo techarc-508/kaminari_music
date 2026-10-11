@@ -9,8 +9,13 @@ import com.example.kaminarimusic.data.local.entity.ArtistEntity
 import com.example.kaminarimusic.data.local.entity.SongEntity
 import com.example.kaminarimusic.data.repository.MusicRepository
 import com.example.kaminarimusic.service.playback.PlayerManager
+import com.example.kaminarimusic.data.local.OfflineCacheManager
+import com.example.kaminarimusic.data.local.OfflinePreferences
+import com.example.kaminarimusic.data.local.OfflinePreferencesManager
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -33,11 +38,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val favoriteSongs: StateFlow<List<SongEntity>> = repository.favoriteSongs
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val downloadedSongs: StateFlow<List<SongEntity>> = repository.downloadedSongs
+    val offlinePrefsManager = OfflinePreferencesManager(application)
+    val offlineCacheManager = OfflineCacheManager(application, database.musicDao(), offlinePrefsManager)
+
+    val offlinePreferences: StateFlow<OfflinePreferences> = offlinePrefsManager.offlinePreferencesFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), OfflinePreferences())
+
+    val offlineSongs: StateFlow<List<SongEntity>> = repository.offlineSongs
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val pendingOperations = repository.pendingOperations
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val offlineCount: StateFlow<Int> = repository.offlineCachedCount
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    private val _cacheSizeMb = MutableStateFlow(0f)
+    val cacheSizeMb: StateFlow<Float> = _cacheSizeMb.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -309,6 +323,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 sampleAlbums.forEach { database.musicDao().insertAlbum(it) }
             }
+            offlineCacheManager.cacheAllLibraryForOffline()
+            _cacheSizeMb.value = offlineCacheManager.getCacheSizeMb()
         }
     }
 
@@ -338,6 +354,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val localSongs = com.example.kaminarimusic.util.MusicScanner.scanDeviceForMusic(getApplication())
             localSongs.forEach { repository.insertSong(it) }
+        }
+    }
+
+    fun cacheSongOffline(songId: Long) {
+        viewModelScope.launch {
+            offlineCacheManager.cacheSongForOffline(songId)
+            _cacheSizeMb.value = offlineCacheManager.getCacheSizeMb()
+        }
+    }
+
+    fun cacheAllLibraryOffline() {
+        viewModelScope.launch {
+            offlineCacheManager.cacheAllLibraryForOffline()
+            _cacheSizeMb.value = offlineCacheManager.getCacheSizeMb()
+        }
+    }
+
+    fun clearOfflineCache() {
+        viewModelScope.launch {
+            offlineCacheManager.clearOfflineCache()
+            _cacheSizeMb.value = offlineCacheManager.getCacheSizeMb()
+        }
+    }
+
+    fun toggleForceOfflineMode(forced: Boolean) {
+        viewModelScope.launch {
+            offlinePrefsManager.setOfflineMode(forced)
+        }
+    }
+
+    fun setNavidromeConnectionStatus(connected: Boolean) {
+        viewModelScope.launch {
+            offlinePrefsManager.setNavidromeConnected(connected)
         }
     }
 
